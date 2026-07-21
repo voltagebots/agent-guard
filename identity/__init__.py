@@ -1,5 +1,6 @@
 from .attestation import Attestation, AttestationResult, Attestor, LocalAttestor
 from .broker import Broker, RefusedError
+from .remote import E2BRuntime, ProviderAttestor, RemoteClient, RemoteSandbox
 from .runtime import (
     ContainerRuntime,
     ContainerSandbox,
@@ -17,7 +18,11 @@ __all__ = [
     "Broker",
     "ContainerRuntime",
     "ContainerSandbox",
+    "E2BRuntime",
     "LocalAttestor",
+    "ProviderAttestor",
+    "RemoteClient",
+    "RemoteSandbox",
     "LocalRuntime",
     "LocalSandbox",
     "RefusedError",

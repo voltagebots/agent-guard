@@ -77,11 +77,16 @@ Higher layer wins (org override beats provider default). Every verdict carries `
 Some decisions the heuristic can't make. A rule can opt into a judge — consulted only when it matches, like conflict-lens's optional resolver:
 
 ```python
-from agent_guard import Guard, CallableJudge, Decision
+from agent_guard import Guard, LLMJudge
 
-judge = CallableJudge(lambda req: (Decision.DENY, "path looks destructive"))
-guard = Guard(compiled, audit=sink, agent_id="a", judge=judge)
+# bring any model — wire a different vendor than the agent for real diversity
+def complete(prompt: str) -> str:
+    return my_llm_client.complete(prompt)   # anthropic / openai / local — your call
+
+guard = Guard(compiled, audit=sink, agent_id="a", judge=LLMJudge(complete))
 ```
+
+`LLMJudge` is provider-agnostic (a `complete(prompt) -> str` callable), so you bring your own model family. `ReferenceJudge` is a deterministic offline judge for tests and air-gapped defaults; `CallableJudge` wraps any function.
 
 Fenced, on purpose:
 - The judge may only tighten. Its result is clamped to the rule's `judge_ceiling` (default `require_human`) — it can escalate toward safe, never unilaterally `allow` an irreversible action.
