@@ -41,6 +41,10 @@ guard run --dev-trust-runtime -- echo hi
 
 See the open issues labeled `good first issue` and `help wanted`. High-value areas: real backend verification (Docker/E2B), audit sinks (SIEM/OpenTelemetry), and real-world policy modules for common MCP servers.
 
+## Releasing
+
+Publishing uses PyPI Trusted Publishing (OIDC) — no API token stored. One-time setup: on PyPI, add a trusted publisher for this repo (`.github/workflows/release.yml`, environment `pypi`). Then to cut a release: bump `version` in `pyproject.toml`, tag `vX.Y.Z`, and push the tag — the `release` workflow builds and publishes. Validate locally first with `python -m build && twine check dist/*`.
+
 ## License
 
 By contributing you agree your contributions are licensed under [Apache-2.0](LICENSE).
