@@ -10,7 +10,7 @@ A small, harness-agnostic library that wraps the tool-dispatch seam every agent 
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest -q            # 49 tests, fast, deterministic, no network
+python -m pytest -q            # fast + deterministic; docker-gated smoke tests skip without an engine
 python examples/end_to_end.py  # the four pillars on your laptop
 guard run --dev-trust-runtime -- echo hi
 ```
