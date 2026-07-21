@@ -1,0 +1,93 @@
+from __future__ import annotations
+
+from agent_guard import BlockedError, Decision, Guard, MemoryAuditSink, PolicyModule, PolicyRegistry
+from identity import Broker, LocalAttestor, LocalRuntime, RefusedError, RuntimeSpec
+
+
+def real_tools(tool: str, args: dict) -> str:
+    return f"EXECUTED {tool}({args})"
+
+
+def policy():
+    org = PolicyModule.from_dict(
+        {
+            "name": "org-base",
+            "namespace": "*",
+            "layer": 100,
+            "rules": [
+                {"id": "no-drop", "decision": "deny", "tools": ["sql"],
+                 "arg_patterns": [r"(?i)drop table"], "reason": "destructive sql banned"},
+                {"id": "prod-needs-microvm", "decision": "allow", "tools": ["prod_write"],
+                 "min_trust_tier": "remote.microvm",
+                 "reason": "prod writes only from a hardware-attested runtime"},
+            ],
+        }
+    )
+    sql = PolicyModule.from_dict(
+        {"name": "sql-defaults", "namespace": "sql*", "layer": 0,
+         "rules": [{"id": "reads-ok", "decision": "allow", "tools": ["sql"], "reason": "reads fine"}]}
+    )
+    return PolicyRegistry(default=Decision.DENY).register(org).register(sql).compile()
+
+
+def main() -> None:
+    print("=== four pillars, end to end (local runtime) ===\n")
+
+    # WHERE: spawn an isolated local runtime
+    runtime = LocalRuntime(tool_fn=real_tools)
+    sandbox = runtime.spawn(RuntimeSpec(code_digest="sha256:agent-image-v1", kind="local.container"))
+
+    # WHO: attest the runtime, then mint a scoped short-lived identity
+    attestor = LocalAttestor(allowlist={"sha256:agent-image-v1"})
+    result = attestor.verify(sandbox.attest())
+    print(f"attestation: verified={result.verified} tier={result.trust_tier} ({result.reason})")
+
+    broker = Broker(secret=b"local-dev-secret", ttl_seconds=300)
+    try:
+        token = broker.mint(
+            result,
+            subject="human:frank",
+            human_grant={"read:repo", "write:branch", "sql"},
+            task_scope={"read:repo", "sql", "prod_write"},
+        )
+    except RefusedError as err:
+        print(f"broker refused: {err}")
+        return
+
+    print(f"identity:    {token.agent_id} sandbox={token.sandbox_id}")
+    print(f"scopes:      {list(token.scopes)}  (human_grant intersect task_scope)")
+    print(f"tier:        {token.trust_tier}\n")
+
+    # WHAT + DID: guard authorizes on the minted identity + tier, audits every call
+    audit = MemoryAuditSink()
+    guard = Guard(policy(), audit=audit, agent_id=token.agent_id, trust_tier=token.trust_tier)
+    guarded = guard.wrap(sandbox.dispatch)
+
+    attempts = [
+        ("sql", {"query": "SELECT * FROM users"}),
+        ("sql", {"query": "DROP TABLE users"}),
+        ("prod_write", {"target": "prod-db", "op": "write"}),
+    ]
+    for tool, args in attempts:
+        try:
+            print(f"ALLOWED  {tool} -> {guarded(tool, args)}")
+        except BlockedError as err:
+            print(f"BLOCKED  {tool} -> {err}")
+
+    sandbox.close()
+
+    print("\n=== audit (attributed to the agent identity) ===")
+    for record in audit.records:
+        flag = "ran" if record.executed else "blocked"
+        print(f"[{flag}] {record.agent_id} {record.tool}: {record.reason}")
+
+    blocked = sum(1 for r in audit.records if not r.executed)
+    assert blocked == 2, f"expected 2 blocked, got {blocked}"
+    print(
+        "\nprod_write blocked: the local identity's tier (local.container) is below the "
+        "remote.microvm the policy requires. A local agent cannot self-elevate."
+    )
+
+
+if __name__ == "__main__":
+    main()

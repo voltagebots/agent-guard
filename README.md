@@ -95,9 +95,23 @@ Fenced, on purpose:
 - Capability = what policy permits, not what the prompt says. Enforcement is code, not instruction.
 - Cross-harness. The wrapped seam is a plain callable, so the same guard fits a raw loop, MCP, or native function-calling.
 
-## Where this is going
+## Four pillars — identity, authorization, audit, isolation
 
-Identity (who the agent is, scoped and short-lived) + this guard (what it may do) + audit (what it did) is the trio. This repo is the `what` and the `did`. The `who` — per-agent identity, delegated from a human, cross-vendor — is the next block.
+The `identity/` package is a local-first companion block: it mints a scoped, short-lived per-agent identity from an attested runtime, so the guard authorizes on *who the agent is* and *where it runs* — not the human's inherited permissions.
+
+```
+spawn (isolated runtime) -> attest -> mint scoped token -> guard authorizes on tier -> audit
+```
+
+Run the whole thing on your laptop, zero cloud:
+
+```bash
+python examples/end_to_end.py
+```
+
+It spawns a local sandbox, attests it, mints an identity whose scopes are `human_grant ∩ task_scope`, then shows a read allowed, a `DROP TABLE` denied, and a `prod_write` blocked because a `local.container` identity is below the `remote.microvm` tier the policy requires — a local agent cannot self-elevate.
+
+The block boundary is deliberate: `identity` does not import `agent_guard` and vice versa; the example wires them. Identity says *who/where*, the guard says *what*, the audit sink says *did*. See `docs/DESIGN-runtime-identity-binding.md` for the local-and-remote design and the honest trust gradient.
 
 ## Status
 
