@@ -15,9 +15,11 @@ Agents run with their operator's full permissions and no record of what they did
 ## Install
 
 ```bash
-pip install agent-guard              # core, zero runtime dependencies
-pip install "agent-guard[yaml]"      # + YAML policy files
+pip install agentguard              # core, zero runtime dependencies
+pip install "agentguard[yaml]"      # + YAML policy files
 ```
+
+> Published as `agentguard` on PyPI (the `agent-guard` name was taken). Import path is `agent_guard`; the CLI is `guard`.
 
 From source (dev):
 

@@ -1,5 +1,5 @@
 [project]
-name = "agent-guard"
+name = "agentguard"
 version = "0.0.1"
 description = "Least-privilege authorization, per-agent identity, and audit for AI agent tool calls. Harness-agnostic, local-first, fail-closed."
 readme = "README.md"
