@@ -1,4 +1,12 @@
-from .audit import AuditRecord, AuditSink, JsonlAuditSink, MemoryAuditSink, MultiAuditSink, WebhookAuditSink
+from .audit import (
+    AuditRecord,
+    AuditSink,
+    CallableAuditSink,
+    JsonlAuditSink,
+    MemoryAuditSink,
+    MultiAuditSink,
+    WebhookAuditSink,
+)
 from .bundled import bundled_module, bundled_names, with_bundled
 from .decision import Decision, Verdict, clamp
 from .guard import ApprovalRequest, BlockedError, Guard, guarded
@@ -14,6 +22,7 @@ __all__ = [
     "AuditRecord",
     "AuditSink",
     "BlockedError",
+    "CallableAuditSink",
     "CallableJudge",
     "CompiledPolicy",
     "Decision",

@@ -80,6 +80,20 @@ def _urllib_post(url: str, body: bytes, headers: dict, timeout: float) -> None:
         raise RuntimeError(f"audit webhook POST to {url} failed: {err}") from err
 
 
+class CallableAuditSink:
+    """Wraps any `emit(record)` callable — the escape hatch for OpenTelemetry, statsd,
+    a message queue, or a custom pipeline, without agent-guard depending on any of them.
+
+        sink = CallableAuditSink(lambda r: otel_logger.emit(body=asdict(r)))
+    """
+
+    def __init__(self, emit: Callable[[AuditRecord], None]) -> None:
+        self._emit = emit
+
+    def write(self, record: AuditRecord) -> None:
+        self._emit(record)
+
+
 class MultiAuditSink:
     """Fan-out to several sinks (e.g. local JSONL + remote SIEM). Attempts every sink
     even if one fails, so durable local audit survives a flaky remote, then raises an
