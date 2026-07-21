@@ -1,5 +1,9 @@
 # agent-guard
 
+[![ci](https://github.com/voltagebots/agent-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/voltagebots/agent-guard/actions/workflows/ci.yml)
+[![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![python](https://img.shields.io/badge/python-3.9%2B-3776ab.svg)](pyproject.toml)
+
 Least-privilege authorization + audit for AI agent tool calls. One small library that wraps the seam every agent has — the tool-dispatch boundary — and decides `allow` / `deny` / `require_human` per call, then logs every decision.
 
 Harness-agnostic by design: it wraps a plain `dispatch(tool, args)` function, which is the shape of a raw agent loop, an MCP `call_tool`, and a native function-calling executor alike. No framework lock-in.
