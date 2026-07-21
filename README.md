@@ -15,8 +15,15 @@ Agents run with their operator's full permissions and no record of what they did
 ## Install
 
 ```bash
-pip install -e .            # core, zero dependencies
-pip install -e ".[yaml]"    # + YAML policy files
+pip install agent-guard              # core, zero runtime dependencies
+pip install "agent-guard[yaml]"      # + YAML policy files
+```
+
+From source (dev):
+
+```bash
+git clone https://github.com/voltagebots/agent-guard && cd agent-guard
+pip install -e ".[dev]" && python -m pytest -q
 ```
 
 ## Integrate — pick the one that fits your stack
