@@ -36,6 +36,10 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 packages = ["agent_guard", "identity"]
 
+[tool.setuptools.package-data]
+agent_guard = ["py.typed"]
+identity = ["py.typed"]
+
 [tool.ruff]
 line-length = 120
 
