@@ -55,7 +55,7 @@ Shows a benign query allowed, a `DROP TABLE` blocked, a `git push --force` gated
 - Policy — an explicit `default` (required — no silent fallback) plus ordered `rules`. First matching rule wins.
 - Rule — `tools` (glob) + optional `arg_patterns` (regex over the rendered args) → a `decision`.
 - Guard — wraps a `dispatch(tool, args)`; evaluates, gates, executes, audits.
-- Audit — one structured record per decision (`JsonlAuditSink`, `MemoryAuditSink`, or your own `AuditSink`).
+- Audit — one structured record per decision. Sinks: `JsonlAuditSink` (local file), `WebhookAuditSink` (ship to a SIEM / collector — fail-loud, never drops), `MultiAuditSink` (fan-out: durable local + remote), `MemoryAuditSink` (tests), or your own `AuditSink`.
 
 ## Scaling policy — federated, layered, cached (goose-style)
 

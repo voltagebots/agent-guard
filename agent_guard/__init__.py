@@ -1,4 +1,4 @@
-from .audit import AuditRecord, AuditSink, JsonlAuditSink, MemoryAuditSink
+from .audit import AuditRecord, AuditSink, JsonlAuditSink, MemoryAuditSink, MultiAuditSink, WebhookAuditSink
 from .bundled import bundled_module, bundled_names, with_bundled
 from .decision import Decision, Verdict, clamp
 from .guard import ApprovalRequest, BlockedError, Guard
@@ -24,7 +24,9 @@ __all__ = [
     "build_prompt",
     "parse_verdict",
     "MemoryAuditSink",
+    "MultiAuditSink",
     "Policy",
+    "WebhookAuditSink",
     "PolicyModule",
     "PolicyRegistry",
     "Rule",
