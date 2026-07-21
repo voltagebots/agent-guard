@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 import uuid
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
@@ -7,12 +9,15 @@ from typing import Any, Callable, Protocol
 from .attestation import Attestation
 
 ToolFn = Callable[[str, dict], Any]
+EXEC_TOOLS = {"shell", "exec"}
 
 
 @dataclass(frozen=True)
 class RuntimeSpec:
-    code_digest: str
+    code_digest: str = ""
     kind: str = "local.container"
+    image: str | None = None
+    network: bool = False
 
 
 class Sandbox(Protocol):
@@ -51,3 +56,61 @@ class LocalRuntime:
 
     def spawn(self, spec: RuntimeSpec) -> LocalSandbox:
         return LocalSandbox(spec, self._tool_fn)
+
+
+def _find_engine() -> str:
+    for engine in ("docker", "podman"):
+        if shutil.which(engine):
+            return engine
+    raise RuntimeError("no container engine found; install docker or podman (no fallback by design)")
+
+
+def _run(argv: list[str]) -> str:
+    result = subprocess.run(argv, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(f"{' '.join(argv[:2])} failed: {result.stderr.strip()}")
+    return result.stdout.strip()
+
+
+class ContainerSandbox:
+    def __init__(self, container_id: str, image_digest: str, engine: str) -> None:
+        self._container_id = container_id
+        self._image_digest = image_digest
+        self._engine = engine
+        self._closed = False
+
+    def attest(self) -> Attestation:
+        return Attestation(
+            runtime_kind="local.container",
+            code_digest=self._image_digest,
+            sandbox_id=self._container_id[:12],
+            evidence={"engine": self._engine, "container_id": self._container_id},
+        )
+
+    def dispatch(self, tool: str, args: dict) -> Any:
+        if self._closed:
+            raise RuntimeError("sandbox is closed")
+        if tool not in EXEC_TOOLS:
+            raise ValueError(f"container sandbox only runs {EXEC_TOOLS}, got '{tool}'")
+        return _run([self._engine, "exec", self._container_id, "sh", "-c", args["cmd"]])
+
+    def close(self) -> None:
+        if not self._closed:
+            subprocess.run([self._engine, "rm", "-f", self._container_id], capture_output=True)
+            self._closed = True
+
+
+class ContainerRuntime:
+    def __init__(self, engine: str | None = None) -> None:
+        self._engine = engine or _find_engine()
+
+    def spawn(self, spec: RuntimeSpec) -> ContainerSandbox:
+        if not spec.image:
+            raise ValueError("container runtime requires spec.image")
+        argv = [self._engine, "run", "-d", "--rm"]
+        if not spec.network:
+            argv += ["--network", "none"]
+        argv += [spec.image, "sleep", "infinity"]
+        container_id = _run(argv)
+        image_digest = _run([self._engine, "inspect", "--format", "{{.Image}}", container_id])
+        return ContainerSandbox(container_id, image_digest, self._engine)

@@ -1,6 +1,13 @@
 from .attestation import Attestation, AttestationResult, Attestor, LocalAttestor
 from .broker import Broker, RefusedError
-from .runtime import LocalRuntime, LocalSandbox, RuntimeSpec, Sandbox
+from .runtime import (
+    ContainerRuntime,
+    ContainerSandbox,
+    LocalRuntime,
+    LocalSandbox,
+    RuntimeSpec,
+    Sandbox,
+)
 from .token import Token, sign, verify
 
 __all__ = [
@@ -8,6 +15,8 @@ __all__ = [
     "AttestationResult",
     "Attestor",
     "Broker",
+    "ContainerRuntime",
+    "ContainerSandbox",
     "LocalAttestor",
     "LocalRuntime",
     "LocalSandbox",

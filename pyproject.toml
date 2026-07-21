@@ -5,6 +5,9 @@ description = "Least-privilege authorization + audit for AI agent tool calls. Ha
 requires-python = ">=3.9"
 dependencies = []
 
+[project.scripts]
+guard = "agent_guard.cli:main"
+
 [project.optional-dependencies]
 yaml = ["pyyaml>=6"]
 dev = ["pytest>=8", "pyyaml>=6"]

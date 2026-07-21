@@ -95,6 +95,23 @@ Fenced, on purpose:
 - Capability = what policy permits, not what the prompt says. Enforcement is code, not instruction.
 - Cross-harness. The wrapped seam is a plain callable, so the same guard fits a raw loop, MCP, or native function-calling.
 
+## Run a command in a governed sandbox (`guard run`)
+
+Governed terminal execution — spawn a sandbox, mint a scoped identity, run a command through the guard, audit it:
+
+```bash
+guard run --dev-trust-runtime -- echo hello           # runs
+guard run --dev-trust-runtime -- rm -rf /tmp/x         # blocked (exit 3)
+guard run --dev-trust-runtime -- git push --force      # gated: prompts a human
+guard run --policy policy.example.yaml --audit run.jsonl -- ./do-thing.sh
+```
+
+Two backends behind one interface:
+- `--runtime local` (default) — in-process, runs on any laptop, zero cloud. The dev wedge.
+- `--runtime container --image <img>` — real isolation via Docker/Podman (`--network none` by default). Fails loud if no engine is installed — no silent fallback.
+
+Isolation is a commodity we compose (runc / gVisor / Firecracker via the engine), not something we reinvent. The value is the governance wrapped around it: identity, least-privilege authority, audit. Same reason you'd run on Modal or E2B as a backend and keep the four pillars on top.
+
 ## Four pillars — identity, authorization, audit, isolation
 
 The `identity/` package is a local-first companion block: it mints a scoped, short-lived per-agent identity from an attested runtime, so the guard authorizes on *who the agent is* and *where it runs* — not the human's inherited permissions.
