@@ -1,0 +1,26 @@
+default: allow
+
+rules:
+  - id: block-sql-drop
+    decision: deny
+    tools: ["sql", "db_*"]
+    arg_patterns: ["(?i)\\bdrop\\s+table\\b", "(?i)\\btruncate\\b"]
+    reason: destructive SQL is never allowed for an agent
+
+  - id: block-rm-rf
+    decision: deny
+    tools: ["shell", "bash", "exec"]
+    arg_patterns: ["\\brm\\s+-rf\\b", "\\brm\\s+-fr\\b"]
+    reason: recursive force delete is blocked
+
+  - id: gate-force-push
+    decision: require_human
+    tools: ["shell", "bash", "git"]
+    arg_patterns: ["git\\s+push\\b.*--force", "git\\s+push\\b.*-f\\b"]
+    reason: force-push rewrites shared history; a human must approve
+
+  - id: gate-prod-writes
+    decision: require_human
+    tools: ["http_*", "api_*"]
+    arg_patterns: ["(?i)prod", "(?i)production"]
+    reason: writes to production surfaces require a human gate

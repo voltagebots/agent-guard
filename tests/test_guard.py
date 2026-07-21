@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import pytest
+
+from agent_guard import BlockedError, Decision, Guard, MemoryAuditSink, Policy, Verdict
+
+
+def raw_dispatch(tool: str, args: dict) -> str:
+    return f"ran:{tool}"
+
+
+def make_policy(default: str = "allow") -> Policy:
+    return Policy.from_dict(
+        {
+            "default": default,
+            "rules": [
+                {
+                    "id": "block-drop",
+                    "decision": "deny",
+                    "tools": ["sql"],
+                    "arg_patterns": [r"(?i)\bdrop\s+table\b"],
+                    "reason": "no destructive sql",
+                },
+                {
+                    "id": "gate-push",
+                    "decision": "require_human",
+                    "tools": ["git", "shell"],
+                    "arg_patterns": [r"git\s+push\b.*--force"],
+                    "reason": "force push needs a human",
+                },
+            ],
+        }
+    )
+
+
+def make_guard(default: str = "allow", approver=None) -> tuple[Guard, MemoryAuditSink]:
+    audit = MemoryAuditSink()
+    kwargs = {"approver": approver} if approver else {}
+    guard = Guard(make_policy(default), audit=audit, agent_id="agent-test", **kwargs)
+    return guard, audit
+
+
+def test_missing_default_is_rejected():
+    with pytest.raises(ValueError):
+        Policy.from_dict({"rules": []})
+
+
+def test_allow_passes_through_and_audits():
+    guard, audit = make_guard()
+    result = guard.call(raw_dispatch, "sql", {"query": "SELECT 1"})
+    assert result == "ran:sql"
+    assert audit.records[-1].executed is True
+    assert audit.records[-1].decision == "allow"
+
+
+def test_deny_blocks_and_does_not_execute():
+    guard, audit = make_guard()
+    with pytest.raises(BlockedError):
+        guard.call(raw_dispatch, "sql", {"query": "DROP TABLE users"})
+    assert audit.records[-1].executed is False
+    assert audit.records[-1].rule_id == "block-drop"
+
+
+def test_require_human_blocks_when_denied():
+    guard, audit = make_guard(approver=lambda req: False)
+    with pytest.raises(BlockedError):
+        guard.call(raw_dispatch, "git", {"cmd": "git push --force origin main"})
+    assert audit.records[-1].executed is False
+
+
+def test_require_human_runs_when_approved():
+    guard, audit = make_guard(approver=lambda req: True)
+    result = guard.call(raw_dispatch, "git", {"cmd": "git push --force origin main"})
+    assert result == "ran:git"
+    assert audit.records[-1].executed is True
+    assert audit.records[-1].decision == "require_human"
+
+
+def test_require_human_defaults_to_deny():
+    guard, audit = make_guard()
+    with pytest.raises(BlockedError):
+        guard.call(raw_dispatch, "shell", {"cmd": "git push --force"})
+    assert audit.records[-1].executed is False
+
+
+def test_default_deny_blocks_unmatched():
+    guard, _ = make_guard(default="deny")
+    with pytest.raises(BlockedError):
+        guard.call(raw_dispatch, "unknown_tool", {})
+
+
+def test_arg_pattern_scopes_the_match():
+    policy = make_policy()
+    assert policy.evaluate("sql", {"q": "SELECT 1"}).decision is Decision.ALLOW
+    assert policy.evaluate("sql", {"q": "drop table x"}).decision is Decision.DENY
+
+
+def test_tool_glob_matches():
+    policy = Policy.from_dict(
+        {"default": "allow", "rules": [{"id": "r", "decision": "deny", "tools": ["db_*"]}]}
+    )
+    assert policy.evaluate("db_write", {}).decision is Decision.DENY
+    assert policy.evaluate("cache_write", {}).decision is Decision.ALLOW
