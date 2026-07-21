@@ -15,17 +15,30 @@ def policy():
             "namespace": "*",
             "layer": 100,
             "rules": [
-                {"id": "no-drop", "decision": "deny", "tools": ["sql"],
-                 "arg_patterns": [r"(?i)drop table"], "reason": "destructive sql banned"},
-                {"id": "prod-needs-microvm", "decision": "allow", "tools": ["prod_write"],
-                 "min_trust_tier": "remote.microvm",
-                 "reason": "prod writes only from a hardware-attested runtime"},
+                {
+                    "id": "no-drop",
+                    "decision": "deny",
+                    "tools": ["sql"],
+                    "arg_patterns": [r"(?i)drop table"],
+                    "reason": "destructive sql banned",
+                },
+                {
+                    "id": "prod-needs-microvm",
+                    "decision": "allow",
+                    "tools": ["prod_write"],
+                    "min_trust_tier": "remote.microvm",
+                    "reason": "prod writes only from a hardware-attested runtime",
+                },
             ],
         }
     )
     sql = PolicyModule.from_dict(
-        {"name": "sql-defaults", "namespace": "sql*", "layer": 0,
-         "rules": [{"id": "reads-ok", "decision": "allow", "tools": ["sql"], "reason": "reads fine"}]}
+        {
+            "name": "sql-defaults",
+            "namespace": "sql*",
+            "layer": 0,
+            "rules": [{"id": "reads-ok", "decision": "allow", "tools": ["sql"], "reason": "reads fine"}],
+        }
     )
     return PolicyRegistry(default=Decision.DENY).register(org).register(sql).compile()
 

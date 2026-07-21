@@ -5,7 +5,7 @@ import os
 import subprocess
 import sys
 
-from agent_guard import BlockedError, Decision, Guard, JsonlAuditSink, MemoryAuditSink, Policy, load_policy
+from agent_guard import BlockedError, Guard, JsonlAuditSink, MemoryAuditSink, Policy, load_policy
 from agent_guard.guard import ApprovalRequest
 from identity import Broker, ContainerRuntime, LocalAttestor, LocalRuntime, RefusedError, RuntimeSpec
 
@@ -22,13 +22,27 @@ def _default_policy() -> Policy:
         {
             "default": "allow",
             "rules": [
-                {"id": "block-rm-rf", "decision": "deny", "tools": ["shell"],
-                 "arg_patterns": [r"\brm\s+-rf\b", r"\brm\s+-fr\b"], "reason": "recursive force delete blocked"},
-                {"id": "block-sql-drop", "decision": "deny", "tools": ["shell"],
-                 "arg_patterns": [r"(?i)\bdrop\s+table\b"], "reason": "destructive sql blocked"},
-                {"id": "gate-force-push", "decision": "require_human", "tools": ["shell"],
-                 "arg_patterns": [r"git\s+push\b.*--force", r"git\s+push\b.*-f\b"],
-                 "reason": "force-push rewrites shared history"},
+                {
+                    "id": "block-rm-rf",
+                    "decision": "deny",
+                    "tools": ["shell"],
+                    "arg_patterns": [r"\brm\s+-rf\b", r"\brm\s+-fr\b"],
+                    "reason": "recursive force delete blocked",
+                },
+                {
+                    "id": "block-sql-drop",
+                    "decision": "deny",
+                    "tools": ["shell"],
+                    "arg_patterns": [r"(?i)\bdrop\s+table\b"],
+                    "reason": "destructive sql blocked",
+                },
+                {
+                    "id": "gate-force-push",
+                    "decision": "require_human",
+                    "tools": ["shell"],
+                    "arg_patterns": [r"git\s+push\b.*--force", r"git\s+push\b.*-f\b"],
+                    "reason": "force-push rewrites shared history",
+                },
             ],
         }
     )

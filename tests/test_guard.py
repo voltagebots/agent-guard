@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from agent_guard import BlockedError, Decision, Guard, MemoryAuditSink, Policy, Verdict
+from agent_guard import BlockedError, Decision, Guard, MemoryAuditSink, Policy
 
 
 def raw_dispatch(tool: str, args: dict) -> str:
@@ -96,9 +96,7 @@ def test_arg_pattern_scopes_the_match():
 
 
 def test_tool_glob_matches():
-    policy = Policy.from_dict(
-        {"default": "allow", "rules": [{"id": "r", "decision": "deny", "tools": ["db_*"]}]}
-    )
+    policy = Policy.from_dict({"default": "allow", "rules": [{"id": "r", "decision": "deny", "tools": ["db_*"]}]})
     assert policy.evaluate("db_write", {}).decision is Decision.DENY
     assert policy.evaluate("cache_write", {}).decision is Decision.ALLOW
 

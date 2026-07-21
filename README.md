@@ -72,6 +72,16 @@ guard = Guard(compiled, audit=JsonlAuditSink("audit.jsonl"), agent_id="agent-42"
 
 Higher layer wins (org override beats provider default). Every verdict carries `module`, `layer`, `rule_id`, and `reason` — call `verdict.trace()` to see exactly which module/layer/rule decided, so federated policy stays debuggable. Provider-declared defaults are the payoff: a tool source ships its own module with sane guardrails; the org only writes overrides.
 
+Batteries-included modules for common tool surfaces (`shell`, `git`, `postgres`, `filesystem`, `kubernetes`) ship in the box:
+
+```python
+from agent_guard import with_bundled, Decision
+
+compiled = with_bundled(default=Decision.ALLOW).compile()   # rm -rf, DROP TABLE, kubectl delete, ... gated out of the box
+```
+
+Layer your org overrides on top with a higher `layer`. Contribute a module for your favorite MCP server — see the open issues.
+
 ## LLM judge for the ambiguous band
 
 Some decisions the heuristic can't make. A rule can opt into a judge — consulted only when it matches, like conflict-lens's optional resolver:

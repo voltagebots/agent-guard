@@ -25,8 +25,15 @@ def build_registry() -> PolicyRegistry:
             "name": "org-base",
             "namespace": "*",
             "layer": 100,
-            "rules": [{"id": "org-no-drop", "decision": "deny", "tools": ["sql"],
-                       "arg_patterns": [r"(?i)drop table"], "reason": "org bans destructive sql"}],
+            "rules": [
+                {
+                    "id": "org-no-drop",
+                    "decision": "deny",
+                    "tools": ["sql"],
+                    "arg_patterns": [r"(?i)drop table"],
+                    "reason": "org bans destructive sql",
+                }
+            ],
         }
     )
     provider = PolicyModule.from_dict(
@@ -34,8 +41,9 @@ def build_registry() -> PolicyRegistry:
             "name": "sql-provider-defaults",
             "namespace": "sql*",
             "layer": 0,
-            "rules": [{"id": "sql-allow-read", "decision": "allow", "tools": ["sql"],
-                       "reason": "provider default: reads ok"}],
+            "rules": [
+                {"id": "sql-allow-read", "decision": "allow", "tools": ["sql"], "reason": "provider default: reads ok"}
+            ],
         }
     )
     return PolicyRegistry(default=Decision.DENY).register(org).register(provider)
@@ -86,9 +94,16 @@ def judge_registry() -> PolicyRegistry:
         {
             "name": "ambiguous",
             "namespace": "*",
-            "rules": [{"id": "judge-writes", "decision": "require_human", "tools": ["write"],
-                       "judge": True, "judge_ceiling": "require_human",
-                       "reason": "ambiguous write; ask the judge"}],
+            "rules": [
+                {
+                    "id": "judge-writes",
+                    "decision": "require_human",
+                    "tools": ["write"],
+                    "judge": True,
+                    "judge_ceiling": "require_human",
+                    "reason": "ambiguous write; ask the judge",
+                }
+            ],
         }
     )
     return PolicyRegistry(default=Decision.ALLOW).register(mod)
@@ -106,8 +121,7 @@ def test_judge_can_tighten_to_deny():
 def test_judge_allow_is_clamped_to_ceiling():
     audit = MemoryAuditSink()
     judge = CallableJudge(lambda req: (Decision.ALLOW, "looks fine"))
-    guard = Guard(judge_registry().compile(), audit=audit, agent_id="a",
-                  judge=judge, approver=lambda r: True)
+    guard = Guard(judge_registry().compile(), audit=audit, agent_id="a", judge=judge, approver=lambda r: True)
     result = guard.call(raw_dispatch, "write", {"path": "/tmp/x"})
     assert result == "ran:write"
     assert audit.records[-1].decision == "require_human"

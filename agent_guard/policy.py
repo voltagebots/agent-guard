@@ -59,7 +59,7 @@ class Policy:
         return Verdict(decision=self.default, reason="no rule matched; policy default")
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Policy":
+    def from_dict(cls, data: dict[str, Any]) -> Policy:
         if "default" not in data:
             raise ValueError("policy must declare an explicit 'default' decision (allow|deny|require_human)")
         rules = [_rule_from_dict(index, raw) for index, raw in enumerate(data.get("rules", []))]

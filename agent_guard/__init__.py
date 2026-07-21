@@ -1,4 +1,5 @@
 from .audit import AuditRecord, AuditSink, JsonlAuditSink, MemoryAuditSink
+from .bundled import bundled_module, bundled_names, with_bundled
 from .decision import Decision, Verdict, clamp
 from .guard import ApprovalRequest, BlockedError, Guard
 from .judge import CallableJudge, Judge, JudgeRequest, LLMJudge, ReferenceJudge, build_prompt, parse_verdict
@@ -29,6 +30,9 @@ __all__ = [
     "Rule",
     "TRUST_TIERS",
     "Verdict",
+    "bundled_module",
+    "bundled_names",
     "clamp",
     "load_policy",
+    "with_bundled",
 ]

@@ -85,4 +85,6 @@ class Guard:
         except Exception as err:  # noqa: BLE001 - judge is an untrusted edge; fail closed to the rule fallback
             return replace(verdict, reason=f"judge error ({err}); fail-closed to {fallback.value}")
         final = clamp(decision, verdict.judge_ceiling)
-        return replace(verdict, decision=final, reason=f"judge->{final.value} (ceiling {verdict.judge_ceiling.value}): {why}")
+        return replace(
+            verdict, decision=final, reason=f"judge->{final.value} (ceiling {verdict.judge_ceiling.value}): {why}"
+        )

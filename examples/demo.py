@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_guard import BlockedError, Decision, Guard, MemoryAuditSink, Policy
+from agent_guard import BlockedError, Guard, MemoryAuditSink, Policy
 
 
 def raw_dispatch(tool: str, args: dict) -> str:

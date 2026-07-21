@@ -15,7 +15,7 @@ from agent_guard import (
     parse_verdict,
 )
 from agent_guard.judge import build_prompt
-from identity import Attestation, Broker, ProviderAttestor, RemoteSandbox
+from identity import Broker, ProviderAttestor, RemoteSandbox
 
 
 def raw_dispatch(tool: str, args: dict) -> str:
@@ -24,8 +24,19 @@ def raw_dispatch(tool: str, args: dict) -> str:
 
 def judge_policy():
     mod = PolicyModule.from_dict(
-        {"name": "band", "rules": [{"id": "judge-writes", "decision": "require_human", "tools": ["write"],
-                                    "judge": True, "judge_ceiling": "require_human", "reason": "ambiguous"}]}
+        {
+            "name": "band",
+            "rules": [
+                {
+                    "id": "judge-writes",
+                    "decision": "require_human",
+                    "tools": ["write"],
+                    "judge": True,
+                    "judge_ceiling": "require_human",
+                    "reason": "ambiguous",
+                }
+            ],
+        }
     )
     return PolicyRegistry(default=Decision.ALLOW).register(mod).compile()
 

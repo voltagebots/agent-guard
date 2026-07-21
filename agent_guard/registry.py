@@ -5,27 +5,38 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .decision import Decision, Verdict
-from .policy import Policy, Rule, verdict_for_rule, _render_args
+from .policy import Policy, Rule, _render_args, verdict_for_rule
 from .tiers import TRUST_TIERS
+
+
+def _as_namespaces(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ("*",)
+    if isinstance(value, str):
+        return (value,)
+    return tuple(value)
 
 
 @dataclass
 class PolicyModule:
     name: str
     rules: list[Rule]
-    namespace: str = "*"
+    namespace: tuple[str, ...] = ("*",)
     layer: int = 0
 
+    def __post_init__(self) -> None:
+        self.namespace = _as_namespaces(self.namespace)
+
     def covers(self, tool: str) -> bool:
-        return self.namespace == "*" or fnmatch.fnmatch(tool, self.namespace)
+        return any(ns == "*" or fnmatch.fnmatch(tool, ns) for ns in self.namespace)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PolicyModule":
+    def from_dict(cls, data: dict[str, Any]) -> PolicyModule:
         policy = Policy.from_dict({"default": "deny", "rules": data.get("rules", [])})
         return cls(
             name=data.get("name", "module"),
             rules=policy.rules,
-            namespace=data.get("namespace", "*"),
+            namespace=_as_namespaces(data.get("namespace")),
             layer=int(data.get("layer", 0)),
         )
 
@@ -36,18 +47,14 @@ class PolicyRegistry:
         self._modules: list[PolicyModule] = []
         self._compiled: list[tuple[PolicyModule, Rule]] | None = None
 
-    def register(self, module: PolicyModule) -> "PolicyRegistry":
+    def register(self, module: PolicyModule) -> PolicyRegistry:
         self._modules.append(module)
         self._compiled = None
         return self
 
-    def compile(self) -> "CompiledPolicy":
+    def compile(self) -> CompiledPolicy:
         ordered = sorted(
-            (
-                (module, rule)
-                for order, module in enumerate(self._modules)
-                for rule in module.rules
-            ),
+            ((module, rule) for order, module in enumerate(self._modules) for rule in module.rules),
             key=lambda pair: (-pair[0].layer, self._modules.index(pair[0])),
         )
         self._compiled = ordered

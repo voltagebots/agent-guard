@@ -56,9 +56,12 @@ class ProviderAttestor:
 
     def verify(self, attestation: Attestation) -> AttestationResult:
         if attestation.code_digest not in self._allow:
-            return AttestationResult(False, "local.process", attestation.sandbox_id,
-                                     f"template '{attestation.code_digest}' not allowlisted")
-        return AttestationResult(True, "remote.gvisor", attestation.sandbox_id, "template allowlisted (provider-asserted)")
+            return AttestationResult(
+                False, "local.process", attestation.sandbox_id, f"template '{attestation.code_digest}' not allowlisted"
+            )
+        return AttestationResult(
+            True, "remote.gvisor", attestation.sandbox_id, "template allowlisted (provider-asserted)"
+        )
 
 
 class E2BRuntime:
