@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from dataclasses import replace
 from typing import Any, Callable
 
@@ -55,23 +56,31 @@ class Guard:
 
         return guarded
 
-    def call(self, dispatch: ToolDispatch, tool: str, args: dict[str, Any]) -> Any:
+    def decide(self, tool: str, args: dict[str, Any]) -> tuple[bool, Verdict]:
+        """Pure decision: returns (allowed, verdict). Runs policy + judge + human gate but
+        does not dispatch or audit. `verdict.decision` keeps its original tier
+        (allow/deny/require_human) for the audit record; `allowed` is the gate outcome."""
         verdict = self._policy.evaluate(tool, args, self._trust_tier)
         if verdict.needs_judge:
             verdict = self._consult_judge(verdict, tool, args)
-
         if verdict.decision is Decision.DENY:
-            self._audit.write(build_record(self._agent_id, tool, args, verdict, executed=False))
-            raise BlockedError(tool, verdict.reason)
-
+            return False, verdict
         if verdict.decision is Decision.REQUIRE_HUMAN:
             approved = self._approver(ApprovalRequest(self._agent_id, tool, args, verdict.reason))
-            if not approved:
-                self._audit.write(build_record(self._agent_id, tool, args, verdict, executed=False))
-                raise BlockedError(tool, f"human approval denied: {verdict.reason}")
+            return approved, verdict
+        return True, verdict
 
+    def record(self, tool: str, args: dict[str, Any], verdict: Verdict, executed: bool) -> None:
+        self._audit.write(build_record(self._agent_id, tool, args, verdict, executed))
+
+    def call(self, dispatch: ToolDispatch, tool: str, args: dict[str, Any]) -> Any:
+        allowed, verdict = self.decide(tool, args)
+        if not allowed:
+            self.record(tool, args, verdict, executed=False)
+            reason = verdict.reason if verdict.decision is Decision.DENY else f"human approval denied: {verdict.reason}"
+            raise BlockedError(tool, reason)
         result = dispatch(tool, args)
-        self._audit.write(build_record(self._agent_id, tool, args, verdict, executed=True))
+        self.record(tool, args, verdict, executed=True)
         return result
 
     def _consult_judge(self, verdict: Verdict, tool: str, args: dict[str, Any]) -> Verdict:
@@ -88,3 +97,32 @@ class Guard:
         return replace(
             verdict, decision=final, reason=f"judge->{final.value} (ceiling {verdict.judge_ceiling.value}): {why}"
         )
+
+
+def guarded(guard: Guard, tool_name: str | None = None) -> Callable:
+    """Decorator: protect a plain tool function. The function's keyword arguments are the
+    tool args the policy sees. Raises BlockedError if policy denies.
+
+        @guarded(guard, "run_sql")
+        def run_sql(query): ...
+    """
+
+    def decorate(fn: Callable) -> Callable:
+        name = tool_name or fn.__name__
+
+        @functools.wraps(fn)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            allowed, verdict = guard.decide(name, kwargs)
+            if not allowed:
+                guard.record(name, kwargs, verdict, executed=False)
+                reason = (
+                    verdict.reason if verdict.decision is Decision.DENY else f"human approval denied: {verdict.reason}"
+                )
+                raise BlockedError(name, reason)
+            result = fn(*args, **kwargs)
+            guard.record(name, kwargs, verdict, executed=True)
+            return result
+
+        return wrapper
+
+    return decorate

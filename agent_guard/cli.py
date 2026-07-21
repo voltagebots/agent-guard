@@ -5,8 +5,18 @@ import os
 import subprocess
 import sys
 
-from agent_guard import BlockedError, Guard, JsonlAuditSink, MemoryAuditSink, Policy, load_policy
-from agent_guard.guard import ApprovalRequest
+from agent_guard import (
+    BlockedError,
+    Decision,
+    Guard,
+    JsonlAuditSink,
+    MemoryAuditSink,
+    Policy,
+    load_policy,
+    with_bundled,
+)
+from agent_guard.guard import ApprovalRequest, deny_by_default
+from agent_guard.mcp import run_proxy
 from identity import Broker, ContainerRuntime, LocalAttestor, LocalRuntime, RefusedError, RuntimeSpec
 
 
@@ -111,6 +121,17 @@ def _run(args) -> int:
     return exit_code
 
 
+def _mcp(args) -> int:
+    server_cmd = [c for c in args.server if c != "--"]
+    if not server_cmd:
+        print("no server command; usage: guard mcp --policy p.yaml -- <mcp-server cmd>", file=sys.stderr)
+        return 1
+    policy = load_policy(args.policy) if args.policy else with_bundled(default=Decision.ALLOW).compile()
+    audit = JsonlAuditSink(args.audit) if args.audit else MemoryAuditSink()
+    guard = Guard(policy, audit=audit, agent_id=args.agent_id, approver=deny_by_default)
+    return run_proxy(server_cmd, guard)
+
+
 def broker_mint(result, args):
     secret = os.urandom(32)
     grant = set(args.scope)
@@ -138,16 +159,29 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--show-audit", action="store_true")
     run.add_argument("command", nargs=argparse.REMAINDER, help="-- command to run")
     run.set_defaults(func=_run)
+
+    mcp = sub.add_parser("mcp", help="guard a stdio MCP server (proxy every tools/call)")
+    mcp.add_argument("--policy", help="policy file; default gates common dangerous tools")
+    mcp.add_argument("--audit", help="append audit records to this JSONL file")
+    mcp.add_argument("--agent-id", default="mcp-agent")
+    mcp.add_argument("server", nargs=argparse.REMAINDER, help="-- <mcp-server command>")
+    mcp.set_defaults(func=_mcp)
     return parser
+
+
+def _run_guard(args) -> int:
+    command = [c for c in args.command if c != "--"]
+    if not command:
+        print("nothing to run; usage: guard run -- <command>", file=sys.stderr)
+        return 1
+    args.command = command
+    return _run(args)
 
 
 def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
-    command = [c for c in getattr(args, "command", []) if c != "--"]
-    args.command = command
-    if not command:
-        print("nothing to run; usage: guard run -- <command>", file=sys.stderr)
-        return 1
+    if args.func is _run:
+        return _run_guard(args)
     return args.func(args)
 
 

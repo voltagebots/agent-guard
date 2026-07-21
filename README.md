@@ -19,6 +19,37 @@ pip install -e .            # core, zero dependencies
 pip install -e ".[yaml]"    # + YAML policy files
 ```
 
+## Integrate — pick the one that fits your stack
+
+Three ways in, from zero-code to full control.
+
+1. Guard an MCP server — zero code. Wrap the server command in your MCP client config; every `tools/call` is checked. Nothing else changes.
+
+```jsonc
+// before:  "command": "my-mcp-server", "args": ["--port", "3000"]
+// after:
+{ "command": "guard", "args": ["mcp", "--policy", "policy.yaml", "--", "my-mcp-server", "--port", "3000"] }
+```
+
+2. Decorate a tool function — one line. The function's keyword args are what the policy sees.
+
+```python
+from agent_guard import guarded, Guard, with_bundled, Decision, MemoryAuditSink
+
+guard = Guard(with_bundled(default=Decision.ALLOW).compile(), audit=MemoryAuditSink(), agent_id="agent-1")
+
+@guarded(guard, "run_sql")
+def run_sql(query: str) -> list: ...   # raises BlockedError if policy denies
+```
+
+3. Wrap your dispatch seam — for any custom loop / framework.
+
+```python
+guarded_dispatch = guard.wrap(my_dispatch)   # my_dispatch(tool, args) -> result
+```
+
+All three share one policy engine, one audit trail, one decision logic. Start with the bundled policy (`rm -rf`, `DROP TABLE`, `kubectl delete`, ... gated out of the box), tighten from there.
+
 ## 30-second use
 
 ```python
