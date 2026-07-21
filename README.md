@@ -50,6 +50,8 @@ guarded_dispatch = guard.wrap(my_dispatch)   # my_dispatch(tool, args) -> result
 
 All three share one policy engine, one audit trail, one decision logic. Start with the bundled policy (`rm -rf`, `DROP TABLE`, `kubectl delete`, ... gated out of the box), tighten from there.
 
+Copy-paste runnable MCP walkthrough: [`examples/mcp/`](examples/mcp/) — a policy, a tiny server, and the exact commands (benign call forwarded, `DROP TABLE` blocked before the server sees it).
+
 ## 30-second use
 
 ```python

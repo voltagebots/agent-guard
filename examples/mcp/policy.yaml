@@ -1,0 +1,14 @@
+default: allow
+
+rules:
+  - id: no-destructive-sql
+    decision: deny
+    tools: ["run_sql"]
+    arg_patterns: ["(?i)\\bdrop\\s+table\\b", "(?i)\\btruncate\\b", "(?i)delete\\s+from\\s+\\w+\\s*;?\\s*$"]
+    reason: destructive or unscoped SQL is not allowed
+
+  - id: gate-secret-reads
+    decision: require_human
+    tools: ["read_file"]
+    arg_patterns: ["(?i)\\.env\\b", "(?i)id_rsa", "(?i)/etc/shadow"]
+    reason: reading a secret file needs human approval
