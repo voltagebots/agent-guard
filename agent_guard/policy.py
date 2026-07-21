@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from .decision import Decision, Verdict
+from .tiers import TRUST_TIERS, meets
 
 
 @dataclass(frozen=True)
@@ -17,6 +18,7 @@ class Rule:
     tools: tuple[str, ...]
     arg_patterns: tuple[str, ...] = ()
     reason: str = ""
+    min_trust_tier: str | None = None
 
     def matches(self, tool: str, rendered_args: str) -> bool:
         if not any(fnmatch.fnmatch(tool, pattern) for pattern in self.tools):
@@ -31,15 +33,25 @@ class Policy:
     default: Decision
     rules: list[Rule] = field(default_factory=list)
 
-    def evaluate(self, tool: str, args: dict[str, Any]) -> Verdict:
+    def evaluate(self, tool: str, args: dict[str, Any], trust_tier: str = TRUST_TIERS[0]) -> Verdict:
         rendered_args = _render_args(args)
         for rule in self.rules:
-            if rule.matches(tool, rendered_args):
+            if not rule.matches(tool, rendered_args):
+                continue
+            if rule.min_trust_tier and not meets(trust_tier, rule.min_trust_tier):
                 return Verdict(
-                    decision=rule.decision,
-                    reason=rule.reason or f"matched rule '{rule.id}'",
+                    decision=Decision.DENY,
+                    reason=(
+                        f"tool '{tool}' requires trust tier '{rule.min_trust_tier}'; "
+                        f"caller runtime is '{trust_tier}'"
+                    ),
                     rule_id=rule.id,
                 )
+            return Verdict(
+                decision=rule.decision,
+                reason=rule.reason or f"matched rule '{rule.id}'",
+                rule_id=rule.id,
+            )
         return Verdict(decision=self.default, reason="no rule matched; policy default")
 
     @classmethod
@@ -64,6 +76,7 @@ def _rule_from_dict(index: int, raw: dict[str, Any]) -> Rule:
         tools=tuple(tools),
         arg_patterns=tuple(raw.get("arg_patterns", ())),
         reason=raw.get("reason", ""),
+        min_trust_tier=raw.get("min_trust_tier"),
     )
 
 

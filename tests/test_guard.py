@@ -101,3 +101,44 @@ def test_tool_glob_matches():
     )
     assert policy.evaluate("db_write", {}).decision is Decision.DENY
     assert policy.evaluate("cache_write", {}).decision is Decision.ALLOW
+
+
+def tier_policy() -> Policy:
+    return Policy.from_dict(
+        {
+            "default": "deny",
+            "rules": [
+                {
+                    "id": "prod-write-needs-microvm",
+                    "decision": "allow",
+                    "tools": ["prod_write"],
+                    "min_trust_tier": "remote.microvm",
+                    "reason": "prod writes only from a hardware-attested runtime",
+                }
+            ],
+        }
+    )
+
+
+def test_tier_sufficient_allows():
+    verdict = tier_policy().evaluate("prod_write", {}, trust_tier="remote.microvm")
+    assert verdict.decision is Decision.ALLOW
+
+
+def test_tier_insufficient_denies():
+    verdict = tier_policy().evaluate("prod_write", {}, trust_tier="local.container")
+    assert verdict.decision is Decision.DENY
+    assert "requires trust tier" in verdict.reason
+
+
+def test_guard_carries_trust_tier():
+    audit = MemoryAuditSink()
+    guard = Guard(tier_policy(), audit=audit, agent_id="a", trust_tier="local.process")
+    with pytest.raises(BlockedError):
+        guard.call(raw_dispatch, "prod_write", {})
+    assert audit.records[-1].executed is False
+
+
+def test_unknown_tier_is_rejected():
+    with pytest.raises(ValueError):
+        tier_policy().evaluate("prod_write", {}, trust_tier="not-a-tier")

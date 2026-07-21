@@ -5,6 +5,7 @@ from typing import Any, Callable
 from .audit import AuditSink, build_record
 from .decision import Decision
 from .policy import Policy
+from .tiers import TRUST_TIERS
 
 ToolDispatch = Callable[[str, dict], Any]
 HumanApprover = Callable[["ApprovalRequest"], bool]
@@ -36,11 +37,13 @@ class Guard:
         audit: AuditSink,
         agent_id: str,
         approver: HumanApprover = deny_by_default,
+        trust_tier: str = TRUST_TIERS[0],
     ) -> None:
         self._policy = policy
         self._audit = audit
         self._agent_id = agent_id
         self._approver = approver
+        self._trust_tier = trust_tier
 
     def wrap(self, dispatch: ToolDispatch) -> ToolDispatch:
         def guarded(tool: str, args: dict[str, Any]) -> Any:
@@ -49,7 +52,7 @@ class Guard:
         return guarded
 
     def call(self, dispatch: ToolDispatch, tool: str, args: dict[str, Any]) -> Any:
-        verdict = self._policy.evaluate(tool, args)
+        verdict = self._policy.evaluate(tool, args, self._trust_tier)
 
         if verdict.decision is Decision.DENY:
             self._audit.write(build_record(self._agent_id, tool, args, verdict, executed=False))

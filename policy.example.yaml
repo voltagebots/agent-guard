@@ -24,3 +24,9 @@ rules:
     tools: ["http_*", "api_*"]
     arg_patterns: ["(?i)prod", "(?i)production"]
     reason: writes to production surfaces require a human gate
+
+  - id: prod-write-needs-attested-runtime
+    decision: allow
+    tools: ["prod_write", "deploy"]
+    min_trust_tier: remote.microvm
+    reason: high-authority tools only from a hardware-attested runtime; local identities cannot self-elevate
