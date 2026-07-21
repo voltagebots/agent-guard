@@ -53,6 +53,41 @@ Shows a benign query allowed, a `DROP TABLE` blocked, a `git push --force` gated
 - Guard — wraps a `dispatch(tool, args)`; evaluates, gates, executes, audits.
 - Audit — one structured record per decision (`JsonlAuditSink`, `MemoryAuditSink`, or your own `AuditSink`).
 
+## Scaling policy — federated, layered, cached (goose-style)
+
+One flat file doesn't scale to many tools, teams, and MCP servers. Compose instead: each source ships a `PolicyModule` that owns a tool namespace and a layer. A `PolicyRegistry` aggregates them, compiles a layer-ordered index (cached, recompiled on change), and evaluates by namespace — the same shape goose uses for tools (per-source, namespaced, cached).
+
+```python
+from agent_guard import PolicyRegistry, PolicyModule, Decision, Guard, JsonlAuditSink
+
+org = PolicyModule.from_dict({"name": "org-base", "namespace": "*", "layer": 100,
+    "rules": [{"id": "no-drop", "decision": "deny", "tools": ["sql"],
+               "arg_patterns": [r"(?i)drop table"]}]})
+sql = PolicyModule.from_dict({"name": "sql-defaults", "namespace": "sql*", "layer": 0,
+    "rules": [{"id": "reads-ok", "decision": "allow", "tools": ["sql"]}]})
+
+compiled = PolicyRegistry(default=Decision.DENY).register(org).register(sql).compile()
+guard = Guard(compiled, audit=JsonlAuditSink("audit.jsonl"), agent_id="agent-42")
+```
+
+Higher layer wins (org override beats provider default). Every verdict carries `module`, `layer`, `rule_id`, and `reason` — call `verdict.trace()` to see exactly which module/layer/rule decided, so federated policy stays debuggable. Provider-declared defaults are the payoff: a tool source ships its own module with sane guardrails; the org only writes overrides.
+
+## LLM judge for the ambiguous band
+
+Some decisions the heuristic can't make. A rule can opt into a judge — consulted only when it matches, like conflict-lens's optional resolver:
+
+```python
+from agent_guard import Guard, CallableJudge, Decision
+
+judge = CallableJudge(lambda req: (Decision.DENY, "path looks destructive"))
+guard = Guard(compiled, audit=sink, agent_id="a", judge=judge)
+```
+
+Fenced, on purpose:
+- The judge may only tighten. Its result is clamped to the rule's `judge_ceiling` (default `require_human`) — it can escalate toward safe, never unilaterally `allow` an irreversible action.
+- Fail-closed. No judge configured, judge errors, or judge times out → fall back to the rule's decision, never a silent allow.
+- Use a different model family for security-relevant judging; a same-family self-grade shares its own blind spots.
+
 ## Design stance
 
 - Fail loud at the edge. A policy with no `default` is rejected at load, not silently defaulted.

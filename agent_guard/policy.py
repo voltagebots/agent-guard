@@ -19,6 +19,8 @@ class Rule:
     arg_patterns: tuple[str, ...] = ()
     reason: str = ""
     min_trust_tier: str | None = None
+    judge: bool = False
+    judge_ceiling: Decision = Decision.REQUIRE_HUMAN
 
     def matches(self, tool: str, rendered_args: str) -> bool:
         if not any(fnmatch.fnmatch(tool, pattern) for pattern in self.tools):
@@ -26,6 +28,22 @@ class Rule:
         if not self.arg_patterns:
             return True
         return any(re.search(pattern, rendered_args) for pattern in self.arg_patterns)
+
+
+def verdict_for_rule(rule: Rule, tool: str, trust_tier: str) -> Verdict:
+    if rule.min_trust_tier and not meets(trust_tier, rule.min_trust_tier):
+        return Verdict(
+            decision=Decision.DENY,
+            reason=f"tool '{tool}' requires trust tier '{rule.min_trust_tier}'; caller runtime is '{trust_tier}'",
+            rule_id=rule.id,
+        )
+    return Verdict(
+        decision=rule.decision,
+        reason=rule.reason or f"matched rule '{rule.id}'",
+        rule_id=rule.id,
+        needs_judge=rule.judge,
+        judge_ceiling=rule.judge_ceiling,
+    )
 
 
 @dataclass
@@ -36,22 +54,8 @@ class Policy:
     def evaluate(self, tool: str, args: dict[str, Any], trust_tier: str = TRUST_TIERS[0]) -> Verdict:
         rendered_args = _render_args(args)
         for rule in self.rules:
-            if not rule.matches(tool, rendered_args):
-                continue
-            if rule.min_trust_tier and not meets(trust_tier, rule.min_trust_tier):
-                return Verdict(
-                    decision=Decision.DENY,
-                    reason=(
-                        f"tool '{tool}' requires trust tier '{rule.min_trust_tier}'; "
-                        f"caller runtime is '{trust_tier}'"
-                    ),
-                    rule_id=rule.id,
-                )
-            return Verdict(
-                decision=rule.decision,
-                reason=rule.reason or f"matched rule '{rule.id}'",
-                rule_id=rule.id,
-            )
+            if rule.matches(tool, rendered_args):
+                return verdict_for_rule(rule, tool, trust_tier)
         return Verdict(decision=self.default, reason="no rule matched; policy default")
 
     @classmethod
@@ -70,6 +74,7 @@ def _rule_from_dict(index: int, raw: dict[str, Any]) -> Rule:
     tools = raw.get("tools")
     if not tools:
         raise ValueError(f"rule #{index} is missing a non-empty 'tools' list")
+    ceiling = raw.get("judge_ceiling")
     return Rule(
         id=raw.get("id", f"rule-{index}"),
         decision=Decision(raw["decision"]),
@@ -77,6 +82,8 @@ def _rule_from_dict(index: int, raw: dict[str, Any]) -> Rule:
         arg_patterns=tuple(raw.get("arg_patterns", ())),
         reason=raw.get("reason", ""),
         min_trust_tier=raw.get("min_trust_tier"),
+        judge=bool(raw.get("judge", False)),
+        judge_ceiling=Decision(ceiling) if ceiling else Decision.REQUIRE_HUMAN,
     )
 
 
